@@ -11,7 +11,7 @@ rbobj.computeReducedBasis();
 rbobj.computeDebugData();
 rbobj.outputDiagnostics();
 
-disp('Tesing Boundary Integral Equation..');
+disp('Testing Boundary Integral Equation..');
 
 [oracle, ss] = SingularBIE();
 rbobj = RBObject(oracle, ss);
