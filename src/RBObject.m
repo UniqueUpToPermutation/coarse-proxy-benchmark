@@ -176,7 +176,7 @@ classdef RBObject < handle
             
             if ~this.b_enable_run_parallel
                 for i=1:n
-                    fprintf('Solving coarse system %i...\t(%i / %i)\n', ...
+                    fprintf('Solving coarse system %i...\t(%i / %i)\r', ...
                         permutation(i), i, n);
                     omega = this.m_sample_space(:, permutation(i));
                     coarse_solutions(:, i) = ...
@@ -186,7 +186,7 @@ classdef RBObject < handle
                 sample_space = this.m_sample_space;
                 problem_oracle = this.m_problem_oracle;
                 parfor i=1:n
-                    fprintf('Solving coarse system %i...\t(%i / %i)\n', ...
+                    fprintf('Solving coarse system %i...\t(%i / %i)\r', ...
                         permutation(i), i, n);
                     omega = sample_space(:, permutation(i));
                     coarse_solutions(:, i) = ...
@@ -210,7 +210,7 @@ classdef RBObject < handle
             if ~this.b_enable_run_parallel
                 % Solve fine systems in serial
                 for i=1:n
-                    fprintf('Solving fine system %i...\t(%i / %i)\n', ...
+                    fprintf('Solving fine system %i...\t(%i / %i)\r', ...
                         permutation(i), i, n);
                     omega = this.m_sample_space(:, permutation(i));
                     [uC, op, aux] = this.m_problem_oracle.solveFine(omega);
@@ -223,7 +223,7 @@ classdef RBObject < handle
                 sample_space = this.m_sample_space;
                 problem_oracle = this.m_problem_oracle;
                 parfor i=1:n
-                    fprintf('Solving fine system %i...\t(%i / %i)\n', ...
+                    fprintf('Solving fine system %i...\t(%i / %i)\r', ...
                         permutation(i), i, n);
                     omega = sample_space(:, permutation(i));
                     [uC, op, aux] = problem_oracle.solveFine(omega);
@@ -735,7 +735,7 @@ classdef RBObject < handle
             clock = tic();
             if ~this.b_enable_run_parallel
                 for i=1:nSk_sub
-                    fprintf('Solving fine system %i...\t(%i / %i)\n', range(i), ...
+                    fprintf('Solving fine system %i...\t(%i / %i)\r', range(i), ...
                         i, nSk_sub);
 
                     omega = this.m_sample_space(:, range(i));
@@ -753,7 +753,7 @@ classdef RBObject < handle
                 problem_oracle = this.m_problem_oracle;
                 reduced_basis = this.m_reduced_basis;
                 parfor i=1:nSk_sub
-                    fprintf('Solving fine system %i...\t(%i / %i)\n', range(i), ...
+                    fprintf('Solving fine system %i...\t(%i / %i)\r', range(i), ...
                         i, nSk_sub);
 
                     omega = sample_space(:, range(i));

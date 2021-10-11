@@ -1,6 +1,6 @@
 % Runs a test to make sure that everything is working correctly
 
-disp('Testing Radiative Transport Eqation...');
+fprintf('Testing Radiative Transport Equation...\n\n');
 
 [oracle, ss] = GaussianRTE();
 oracle.setCoarseResolution(8);
@@ -11,7 +11,7 @@ rbobj.computeReducedBasis();
 rbobj.computeDebugData();
 rbobj.outputDiagnostics();
 
-disp('Testing Boundary Integral Equation..');
+fprintf('\n\nTesting Boundary Integral Equation..\n\n');
 
 [oracle, ss] = SingularBIE();
 rbobj = RBObject(oracle, ss);

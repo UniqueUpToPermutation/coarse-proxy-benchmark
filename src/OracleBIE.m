@@ -62,7 +62,7 @@ classdef OracleBIE < ProblemOracle
            	samples = zeros(n_samples * N + N, nRand); 
             for g=1:nRand
                 
-                fprintf("Sampling Fine Operators... (%i / %i)\n", g, nRand);
+                fprintf("Sampling Fine Operators... (%i / %i)\r", g, nRand);
                 
                 omega = sample_space(:, g);
                 rho_c = omega';
@@ -86,6 +86,8 @@ classdef OracleBIE < ProblemOracle
                 samples(1:N, g) = op_diags;
                 samples((N + 1):end, g) = op_sub(:);
             end
+
+            fprintf("\n")
         end
         
         % No auxiliary data needed
