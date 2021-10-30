@@ -8,7 +8,6 @@ function A = Bfunnonsym(i,j, param, b_add_identity)
     A = Kfun(xs(:,i),xs(:,j),param)  / N;
     
     % Generates A from K? 
-
     assert(size(mus, 2) == 1);
     A = mus(i) .* A; % Multiply rows of A by mu_s to form mu_s K
     

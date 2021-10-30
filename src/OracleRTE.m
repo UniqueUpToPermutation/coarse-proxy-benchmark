@@ -6,7 +6,7 @@ classdef OracleRTE < ProblemOracle
         g_p = 64;
         g_rank_or_tol = 1e-6;
         g_skip = 1;
-        g_symm = 'h';
+        g_symm = 'n'; % not symmetric in this case
         g_verbose = 0;
         
         % Number of quadrature points
@@ -27,8 +27,10 @@ classdef OracleRTE < ProblemOracle
         m_mu_t_func
         % Scattering coefficient function
         m_mu_s_func
-        % The vectors K f projected onto the RB space (n_rb x n_s matrix)
-        m_proj_k_f_vectors
+        % The vectors mu_s K f projected onto the RB space (n_rb x n_s matrix)
+        m_proj_mus_k_f_vectors
+        % The vector f projected onto the RB space
+        m_proj_f_vector
     end
     
     methods
@@ -78,22 +80,21 @@ classdef OracleRTE < ProblemOracle
             pck = randperm(N, n_samples);
             nRand = size(sample_space, 2);
 
-            % each column of Apck contains several columns of the M matix 
-            % and the diagonal of the D matrix
-           	samples = zeros(n_samples * N + N, nRand); 
+            % each column of Bpck contains several columns of the M matix 
+           	samples = zeros(n_samples * N, nRand); 
             for g=1:nRand
                 omega = sample_space(:, g);
                 musfuntmp = @(x1, x2) this.m_mu_s_func(x1, x2, omega);
                 mutfuntmp = @(x1, x2) this.m_mu_t_func(x1, x2, omega);
-
-               [N, ~, param, mus] = setupparam(...
-                   OracleRTE.g_quadrature_points, this.m_n_fine, ...
-                   OracleRTE.g_proxy, musfuntmp, mutfuntmp);
-
-                Mtmp = Afun(1:N, pck, param);
-                Dtmp = 1./mus;
                 
-                samples(:, g) = [Mtmp(:); Dtmp(:)];
+                [N, ~, param, ~] = setupparam(...
+                    OracleRTE.g_quadrature_points, this.m_n_fine, ...
+                    OracleRTE.g_proxy, musfuntmp, mutfuntmp);
+
+                % Sample the operator mu_s K
+                Mtmp = Bfunnonsym(1:N, pck, param, false);
+                
+                samples(:, g) = Mtmp(:);
             end
         end
         
@@ -110,11 +111,12 @@ classdef OracleRTE < ProblemOracle
                 musfuntmp = @(x1, x2) this.m_mu_s_func(x1, x2, omega);
                 mutfuntmp = @(x1, x2) this.m_mu_t_func(x1, x2, omega);
 
-               [N, ~, param, ~] = setupparam(...
-                   OracleRTE.g_quadrature_points, this.m_n_fine, ...
-                   OracleRTE.g_proxy, musfuntmp, mutfuntmp);
+               	[N, ~, param, ~] = setupparam(...
+                    OracleRTE.g_quadrature_points, this.m_n_fine, ...
+                    OracleRTE.g_proxy, musfuntmp, mutfuntmp);
 
-                Mtmp = Afun(1:N, pck, param);
+                % Sample the operator mu_s K
+                Mtmp = Bfunnonsym(1:N, pck, param, false);
                 
                 samples(:, g) = Mtmp(:);
             end
@@ -134,21 +136,28 @@ classdef OracleRTE < ProblemOracle
             nBs = size(rb_object.m_reduced_basis, 2);
             nSk = size(rb_object.m_fine_l_operators, 2);
             
-            this.m_proj_k_f_vectors = zeros(nBs, nSk);
+            this.m_proj_mus_k_f_vectors = zeros(nBs, nSk);
             
             for g=1:nSk
                 % The auxiliary data contains the mu_s^{-1} diagonals
-                 this.m_proj_k_f_vectors(:, g) = ...
-                    rb_object.m_reduced_basis' * (rb_object.m_fine_aux{g} ...
-                        * fC - hifie_mv(rb_object.m_fine_l_operators{g}, fC));
+                 this.m_proj_mus_k_f_vectors(:, g) = ...
+                    rb_object.m_reduced_basis' * (hifie_mv(rb_object.m_fine_l_operators{g}, fC));
             end
+            
+            this.m_proj_f_vector = rb_object.m_reduced_basis' * fC;
         end
         
          % Assemble the right hand of a reduced basis solve
          function [proj_f] = assembleRightHand(this, rb_object, ~, sample_index)
-             proj_f = rb_object.interpVector(sample_index, ...
-                 rb_object.m_mixing_matrix, this.m_proj_k_f_vectors);
+             proj_f = - rb_object.interpVector(sample_index, ...
+                 rb_object.m_mixing_matrix, this.m_proj_mus_k_f_vectors);
          end
+         
+         % We need to add I to the operator mu_s K which we interpolate
+        function [offset_op] = getAffineOffsetOperator(~, reduced_basis)
+            n = size(reduced_basis, 2);
+            offset_op = eye(n);
+        end
          
         % View the reduced basis
         function viewBasis(this, reduced_basis, figure_id)
@@ -167,6 +176,13 @@ classdef OracleRTE < ProblemOracle
             imagesc(reshape(result_fine, this.m_n_fine, this.m_n_fine));
             colorbar;
         end
+        
+        % Display a coarse solution
+        function viewCoarseResult(this, result_coarse, figure_id)
+            figure(figure_id);
+            imagesc(reshape(result_coarse, this.m_n_coarse, this.m_n_coarse));
+            colorbar;
+        end
     end
 end
 
@@ -181,7 +197,9 @@ function display_basis_set(uCs, figure_id, nC)
         imagesc(reshape(basis_vec, nC, nC));
         caxis manual
         caxis([0.0 m]);
-        colorbar;
+        set(gca, 'xticklabel', []);
+        set(gca, 'yticklabel', []);
+        % colorbar;
     end
 end
 
@@ -221,20 +239,22 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [result] = compute_coarse(force_func, mu_t_func, ...
     mu_s_func, omega, nC)
+
     % Get parameters from sample space
     musfuntmp = @(x1, x2) mu_s_func(x1, x2, omega);
     mutfuntmp = @(x1, x2) mu_t_func(x1, x2, omega);
-
-    [N,xs,param,mus] = setupparam(OracleRTE.g_quadrature_points, ...
+    
+    [N,xs,param,~] = setupparam(OracleRTE.g_quadrature_points, ...
         nC, OracleRTE.g_proxy, musfuntmp, mutfuntmp);
-
-    DC = diag(1./mus);
-    fC = force_func(xs(1, :), xs(2, :));        
-    fC = fC(:);
-    MC = Afun(1:N, 1:N, param);
-
+    
+    fC2 = force_func(xs(1, :), xs(2, :));        
+    fC2 = fC2(:);
+    MC2 = Bfunnonsym(1:N, 1:N, param, true);
+    
     % Solve coarse radiative transport system and save solution
-    result = MC \ (DC * fC - MC * fC);
+    result2 = MC2 \ fC2 - fC2;
+
+    result = result2;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -253,7 +273,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [operator, diag_elements, fine_solution] = compute_fine(...
     force_func, mu_t_func, mu_s_func, omega, nF)
-
+    
     % Specialize mu_s and mu_t function using parameter sample
     musfuntmp = @(x1, x2) mu_s_func(x1, x2, omega);
     mutfuntmp = @(x1, x2) mu_t_func(x1, x2, omega);
@@ -265,15 +285,21 @@ function [operator, diag_elements, fine_solution] = compute_fine(...
     fC = force_func(xs(1,:), xs(2,:));        
     fC = fC(:);
 
-    % Solve system using HIF
+    % Factor operator using HIF
     opts = struct('skip', OracleRTE.g_skip, 'symm', OracleRTE.g_symm, ...
         'verb', OracleRTE.g_verbose);
-    Afuntmp = @(i,j) Afun(i, j, param);
+    Bfuntmp = @(i,j) Bfunnonsym(i, j, param, true);
     pxyfuntmp = @(x, slf, nbr, l, ctr) pxyfun(x, slf, nbr, l, ctr, param);
-    operator = hifie2(Afuntmp, xs, OracleRTE.g_occ, ...
+    operator2 = hifie2(Bfuntmp, xs, OracleRTE.g_occ, ...
         OracleRTE.g_rank_or_tol, pxyfuntmp, opts);
 
     % Solve system for fine_solution
-    fine_solution = hifie_sv(operator, ...
-        diag_elements * fC - hifie_mv(operator, fC));
+    fine_solution2 = hifie_sv(operator2, fC) - fC;
+    
+    % Factorize mu_s K
+    musKfuntmp = @(i,j) Bfunnonsym(i, j, param, false);
+    operator = hifie2(musKfuntmp, xs, OracleRTE.g_occ, ...
+        OracleRTE.g_rank_or_tol, pxyfuntmp, opts);
+        
+    fine_solution = fine_solution2;
 end

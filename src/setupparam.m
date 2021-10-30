@@ -25,7 +25,8 @@ function [N,xs,param,mus] = setupparam(Q,nC,proxy,musfun,mutfun)
     
     mus = musfun(xs(1,:), xs(2,:))';
     
-    diagval = 1./mus + intgrl(:);
+    % We form the operator K, not the operator A
+    diagval = intgrl(:);
     
     param.Q = Q;
     param.n = nC;
@@ -38,5 +39,6 @@ function [N,xs,param,mus] = setupparam(Q,nC,proxy,musfun,mutfun)
     param.weight = weight;
     param.musfun = musfun;
     param.mutfun = mutfun;
+    param.mus = mus;
 end
 

@@ -1,41 +1,28 @@
-% Construct an oracle and samples space for the Radiative Transport Equation
-[oracle, sample_space] = SingularBIE();
+[oracle, ss] = MoreSamplesSingularBIE();
 
-% oracle is an object which can be used to solve fine and coarse versions
-% of a given problem. The sample_space is a matrix where the columns
-% correspond to parameter values for specific instances of the problem we
-% are looking to solve. See GaussianRTE for more information about how to
-% set up an oracle and a sample space.
+oracle.setCoarseResolution(128);
+oracle.setFineResolution(2048);
 
-% We can set the coarse and fine resolution through the problem oracle
-oracle.setCoarseResolution(32);
-oracle.setFineResolution(256);
+debug_all_fine_solutions = [];
+debug_sample_perm = [];
 
-% We now create an RBOBject. This object is responsible for constructing
-% the reduced basis using the oracle.
-rb_obj = RBObject(oracle, sample_space);
+eps = [0.0001, 0.00005, 0.00002, 0.00001, 0.000005, 0.000002, 0.000001, 0.0000005];
+rbs = [];
+for ep = eps
+    rb = RBObject(oracle, ss);
+    rb.m_selection_epsilon = ep; % Set selection epsilon
+    rb.b_enable_gramm_schmidt_for_operator_selection = true;
+    rb.computeReducedBasis();
+    if isempty(debug_all_fine_solutions)
+        rb.computeDebugData();
+        debug_all_fine_solutions = rb.debug_all_fine_solutions;
+        debug_sample_perm = rb.debug_sample_perm;
+    end
+    rb.outputDiagnosticsReuseDebugData(debug_all_fine_solutions, ...
+        debug_sample_perm);
+    rb.clean_unnecessary(); % Save storage space
+    rbs = [rbs, rb];
+end
 
-% Change the R-factor cutoff for selecting skeleton samples
-rb_obj.m_selection_epsilon = 0.0002,;
-% Whether or not to use the operators to select additional skeletons
-rb_obj.b_enable_additional_operator_skeletons = true;
-rb_obj.b_enable_additional_skeleton_solutions = true;
-rb_obj.b_ignore_operator_sampling_time = true;
-rb_obj.b_enable_gramm_schmidt_for_operator_selection = true;
-
-% Compute our reduced basis
-rb_obj.computeReducedBasis();
-
-% View the reduced basis, parameter is the figure id
-rb_obj.viewReducedBasis(1);
-% View a random result, parameter is the figure id
-rb_obj.viewRandomResult(2);
-
-% Use this to compute a specific RB solution, parameter is the sample 
-% index in the sample space
-[~] = rb_obj.computeRBSolution(1);
-
-% To compute error diagonostics
-subsample_factor = 1.0; % Only sample this fraction of the true solutions
-rb_obj.computeDebugData(subsample_factor);
-rb_obj.outputDiagnostics();
+result_table = table(eps', rbs');
+save result_table_BIE.mat result_table;

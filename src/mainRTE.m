@@ -1,48 +1,42 @@
-% Construct an oracle and samples space for the Radiative Transport Equation
-[oracle, sample_space] = GaussianRTE();
+debug_all_fine_solutions = [];
+debug_sample_perm = [];
+b_fine_solutions_loaded = false;
 
+if isfile('RTE_more_samples_all_fine_solutions.mat')
+    [oracle, ss] = BenchmarkRTE('final');
+    strct = load('RTE_more_samples_all_fine_solutions.mat');
+    debug_all_fine_solutions = strct.debug_all_fine_solutions;
+    debug_sample_perm = 1:size(ss, 2);
+    b_fine_solutions_loaded = true;
+end
 
-% oracle is an object which can be used to solve fine and coarse versions
-% of a given problem. The sample_space is a matrix where the columns
-% correspond to parameter values for specific instances of the problem we
-% are looking to solve. See GaussianRTE for more information about how to
-% set up an oracle and a sample space.
+eps = [0.1 0.05 0.02 0.01 0.005 0.002 0.001 0.0005 0.0002, 0.0001];
+rbs = [];
+for ep = eps
+    % Each RBObject must have its own oracle and ss
+    [oracle, ss] = BenchmarkRTE('final');
 
-% We can set the coarse and fine resolution through the problem oracle
-oracle.setCoarseResolution(16);
-oracle.setFineResolution(32);
+    rb = RBObject(oracle, ss);
+    rb.m_selection_epsilon = ep; % Set selection epsilon
+    
+    rb.b_enable_gramm_schmidt_for_operator_selection = true;
+    rb.b_enable_run_parallel = true;
+    
+    rb.computeReducedBasis();
+    if isempty(debug_all_fine_solutions)
+        rb.computeDebugData();
+        debug_all_fine_solutions = rb.debug_all_fine_solutions;
+        debug_sample_perm = rb.debug_sample_perm;
+    end
+    rb.outputDiagnosticsReuseDebugData(debug_all_fine_solutions, ...
+        debug_sample_perm);
+    rb.clean_unnecessary(); % Save storage space
+    rbs = [rbs, rb];
+end
 
+result_table = table(eps', rbs');
+save result_table_RTE.mat result_table;
+if ~b_fine_solutions_loaded
+    save RTE_fine_solutions.mat debug_all_fine_solutions;
+end
 
-% We now create an RBOBject. This object is responsible for constructing
-% the reduced basis using the oracle.
-rb_obj = RBObject(oracle, sample_space);
-
-% Change the R-factor cutoff for selecting skeleton samples
-rb_obj.m_selection_epsilon = 1E-2;
-% Number of rows to sample from operators
-rb_obj.m_n_operator_samples = 10; 
-% Whether or not to use the operators to select additional skeletons
-rb_obj.b_enable_additional_operator_skeletons = true;
-rb_obj.b_enable_additional_skeleton_solutions = true;
-
-% Compute our reduced basis
-rb_obj.computeReducedBasis();
-
-
-% View the reduced basis, parameter is the figure id
-rb_obj.viewReducedBasis(1);
-% View a random result, parameter is the figure id
-rb_obj.viewRandomResult(2);
-
-
-
-% Use this to compute a specific RB solution, parameter is the sample 
-% index in the sample space
-[~] = rb_obj.computeRBSolution(1);
-
-
-
-% To compute error diagonostics
-subsample_factor = 1.0; % Only sample this fraction of the true solutions
-rb_obj.computeDebugData(subsample_factor);
-rb_obj.outputDiagnostics();
