@@ -63,12 +63,18 @@ classdef RBObject < handle
     
     % Flags
     properties
-        % Whether or not to compute additional skeletons using operator
-        % samples
+        % Whether or not to use the operator samples to select additional 
+        % operators to be used in the operator reconstruction step. If this 
+        % is true, the **RBObject** will select additional fine operators until 
+        % all the operator samples can be reconstructed as a linear combination 
+        % of the chosen fine operators.
         b_enable_additional_operator_skeletons = ...
             RBObject.g_b_additional_operator_skeletons
-        % Whether or not to add additional skeleton solutions on top of
-        % additional operator skeletons.
+        % Only has an effect if the above is true. If set to true, the 
+        % **RBObject** will also solve the corresponding fine solutions of 
+        % the additional operators selected in the additional operator 
+        % selection step. It will add these solutions to the set of solutions 
+        % used to construct the reduced basis.
         b_enable_additional_skeleton_solutions = ...
             RBObject.g_b_additional_skeleton_solutions
         % Whether or not to normalize input data to QR factorizations on
