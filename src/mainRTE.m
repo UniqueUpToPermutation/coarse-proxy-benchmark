@@ -2,9 +2,9 @@ debug_all_fine_solutions = [];
 debug_sample_perm = [];
 b_fine_solutions_loaded = false;
 
-if isfile('RTE_more_samples_all_fine_solutions.mat')
+if isfile('RTE_fine_solutions.mat')
     [oracle, ss] = BenchmarkRTE('final');
-    strct = load('RTE_more_samples_all_fine_solutions.mat');
+    strct = load('RTE_fine_solutions.mat');
     debug_all_fine_solutions = strct.debug_all_fine_solutions;
     debug_sample_perm = 1:size(ss, 2);
     b_fine_solutions_loaded = true;
